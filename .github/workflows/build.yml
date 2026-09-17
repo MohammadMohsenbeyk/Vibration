@@ -30,18 +30,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Locate project (unzip if only VibeTrainer.zip was uploaded)
+      - name: Locate project (works with any zip name/case, or an already-extracted folder)
         run: |
-          if [ -f VibeTrainer.zip ]; then
-            unzip -o VibeTrainer.zip -d extracted
-            echo "PROJECT_DIR=extracted/VibeTrainer" >> "$GITHUB_ENV"
+          ZIP_FILE=$(find . -maxdepth 1 -iname "*.zip" | head -n 1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found zip: $ZIP_FILE"
+            unzip -o "$ZIP_FILE" -d extracted
+            PROJECT_DIR=$(find extracted -maxdepth 3 -name "build.gradle.kts" -not -path "*/app/*" | head -n 1 | xargs dirname)
           elif [ -f build.gradle.kts ]; then
-            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
-          elif [ -f VibeTrainer/build.gradle.kts ]; then
-            echo "PROJECT_DIR=VibeTrainer" >> "$GITHUB_ENV"
+            PROJECT_DIR="."
           else
+            PROJECT_DIR=$(find . -maxdepth 3 -name "build.gradle.kts" -not -path "*/app/*" -not -path "./extracted/*" | head -n 1 | xargs dirname)
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
             echo "Could not locate the Gradle project" && exit 1
           fi
+          echo "Project directory: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Build debug APK
         run: cd "$PROJECT_DIR" && gradle assembleDebug --no-daemon
